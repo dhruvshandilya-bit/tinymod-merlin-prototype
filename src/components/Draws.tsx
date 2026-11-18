@@ -1,5 +1,5 @@
-import React from 'react'
-import { AlertTriangle, CheckCircle2, Download, Info, Lock, Plus, Sparkles, Trash2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { AlertTriangle, CheckCircle2, Download, Info, Lock, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { allocate, contingencyOriginal, drawSummaries, houseDeposit, inLoan, lineDrawn, padTo, resolve, warnings, type Alloc, type Draw, type DrawStatus, type Line } from '../lib/budget'
 import { cents, cn, money, pct, shortDate } from '../lib/util'
@@ -12,6 +12,7 @@ const TODAY = '2026-11-18'
 
 export function Draws() {
   const { project, setProject, setDraws, steps, toast, updateLine } = useStore()
+  const [setupOpen, setSetupOpen] = useState(false)
   const editable = true
   const n = project.draws.length
   // Template lines with no money on this job stay on the Budget tab but add nothing to a draw sheet.
@@ -19,7 +20,8 @@ export function Draws() {
   const al = allocate(project)
   const dr = lineDrawn(project)
   const sums = drawSummaries(project)
-  const warns = warnings(project).filter(w => !w.lineId)
+  // Over-cap warnings already show in the grid's "room left" row; list only the rest up here.
+  const warns = warnings(project).filter(w => !w.lineId && w.drawIdx === undefined)
   const cont = contingencyOriginal(project)
   const dep = houseDeposit(project)
   const stepById = Object.fromEntries(steps.map(s => [s.id, s]))
@@ -74,11 +76,9 @@ export function Draws() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start gap-3">
-        <Callout icon={<Info size={14} />} className="max-w-3xl flex-1">
-          This is the bank's draw sheet <Src refs={{ s: 'DRAW' }} />, built from the same budget lines, as a new tab on the Budget page.
-          Set the draws and the rules once and Merlin works out every line's amount in each draw. Each line can only be drawn up to its approved amount.
-          On the original sheet, <b>rock blasting</b> and <b>dampproofing</b> went into both draw 1 and draw 2 <Src refs={[{ s: 'DRAW', c: 'E18 & F18' }, { s: 'DRAW', c: 'E22 & F22' }]} />,
-          which drew {money(20650)} more than the bank approved. Here each is drawn once <Q ids="Q6" />. The rules come from the 1 Oct call <Src refs={{ s: 'C1001', c: '41:34', note: '35% of the house, then a % of construction per draw; the house balance can come in any draw' }} />.
+        <Callout icon={<Info size={14} />} className="flex-1">
+          The bank's draw sheet <Src refs={{ s: 'DRAW' }} />, built from the same budget lines. A line can only be drawn up to what the bank approved.
+          On your sheet, rock blasting and dampproofing were drawn twice <Src refs={[{ s: 'DRAW', c: 'E18 & F18' }, { s: 'DRAW', c: 'E22 & F22' }]} />; here each is drawn once <Q ids="Q6" />.
         </Callout>
         <Button variant="outline" onClick={() => exportDraws(project)}><Download size={13} /> Export to Excel</Button>
       </div>
@@ -91,18 +91,28 @@ export function Draws() {
         </div>
       )}
 
-      {/* Setup */}
+      {/* Setup: collapsed to one line until you need it */}
       <div className="rounded-xl border border-line bg-white">
-        <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-ink-950">Draw setup</div>
-            <div className="text-2xs text-ink-500">Every bank is different. Set this once per project from the bank's approval letter.</div>
+        <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3', setupOpen && 'border-b border-line')}>
+          <div className="text-[13px] font-semibold text-ink-950">Bank rules</div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-ink-600">
+            <span>{money(project.loan, 0)} loan</span>
+            <span className="text-ink-300">·</span>
+            <span>{n} draws: {project.draws.map(d => pct(d.capPct, 0)).join(' / ')}</span>
+            <span className="text-ink-300">·</span>
+            <span>House: {pct(project.house.depositPct, 0)} deposit in {project.draws[project.house.depositDraw]?.name}, balance in {project.draws[project.house.balanceDraw]?.name}</span>
           </div>
-          {editable && (
-            <button onClick={tryPreset} className="ml-auto inline-flex items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-2xs font-medium text-brand-500 hover:bg-brand-100">
-              <Sparkles size={11} /> Try the 35% house · 10/40/40/10 pattern
-            </button>
-          )}
+          <button onClick={() => setSetupOpen(o => !o)} className="ml-auto inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-2xs font-medium text-ink-700 hover:bg-ink-50">
+            <Settings2 size={12} /> {setupOpen ? 'Close setup' : 'Edit setup'}
+          </button>
+        </div>
+        {setupOpen && (
+        <>
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3 text-2xs text-ink-500">
+          Every bank is different: set this once per job from the bank's approval letter.
+          <button onClick={tryPreset} className="ml-auto inline-flex items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-2xs font-medium text-brand-500 hover:bg-brand-100">
+            <Sparkles size={11} /> Try the 35% house · 10/40/40/10 pattern
+          </button>
         </div>
         <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div>
@@ -195,20 +205,22 @@ export function Draws() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Grid */}
       <div className="overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full border-collapse" style={{ minWidth: 700 + n * 140 }}>
+        <table className="w-full border-collapse" style={{ minWidth: 560 + n * 120 }}>
           <thead>
             <tr>
-              <Hd className="min-w-[220px]"><span className="inline-flex items-center gap-1.5">Line <Q ids="Q5" /></span></Hd>
+              <Hd className="min-w-[180px]"><span className="inline-flex items-center gap-1.5">Line <Q ids="Q5" /></span></Hd>
               <Hd>How it's drawn</Hd>
               <Hd right className="whitespace-nowrap">Bank approved</Hd>
               {project.draws.map((d, i) => {
                 const when = d.status === 'funded' && d.date ? `Funded ${shortDate(d.date)}` : d.stepId && stepById[d.stepId] ? `When: ${stepById[d.stepId].name}` : 'Entered by hand'
                 return (
-                  <Hd key={d.id} right className={cn('min-w-[132px] max-w-[170px]', d.status === 'funded' && 'bg-ok-50')}>
+                  <Hd key={d.id} right className={cn('min-w-[110px] max-w-[150px]', d.status === 'funded' && 'bg-ok-50')}>
                     <div className="flex items-center justify-end gap-1.5 whitespace-nowrap normal-case">
                       <span className="text-[12px] font-semibold text-ink-900">{d.name}</span>
                       <Badge tone={STATUS_TONE[d.status]}>{d.status}</Badge>
@@ -255,11 +267,11 @@ export function Draws() {
                     {l.kind === 'contingency' ? <span className="text-2xs text-ink-400">Held back</span> : (
                       <span className="inline-flex items-center gap-1">
                         <select value={value} disabled={!editable || locked} onChange={e => setAlloc(l, e.target.value)}
-                          className="h-7 max-w-[170px] rounded-md border border-line bg-white px-1 text-2xs text-ink-700 disabled:bg-ink-50 disabled:text-ink-500">
+                          className="h-7 max-w-[140px] rounded-md border border-line bg-white px-1 text-2xs text-ink-700 disabled:bg-ink-50 disabled:text-ink-500">
                           {l.kind === 'house' && <option value="house">House rule</option>}
-                          {project.draws.map((d, i) => <option key={d.id} value={`pin:${i}`}>All in {d.name}</option>)}
-                          <option value="track">Construction track</option>
-                          <option value="split">Custom split</option>
+                          {project.draws.map((d, i) => <option key={d.id} value={`pin:${i}`}>{d.name}</option>)}
+                          <option value="track">Track %</option>
+                          <option value="split">Split %</option>
                         </select>
                         {locked && <span title="Part of this line is already in a funded draw, so its split is locked."><Lock size={11} className="text-ink-400" /></span>}
                       </span>

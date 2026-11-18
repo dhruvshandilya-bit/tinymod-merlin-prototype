@@ -1,5 +1,5 @@
-import React from 'react'
-import { ArrowRight, FileSignature, Home } from 'lucide-react'
+import React, { useState } from 'react'
+import { ArrowRight, ChevronRight, FileSignature, Home } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { ORDER_FORM } from '../data/job'
 import { money, shortDate } from '../lib/util'
@@ -13,12 +13,12 @@ export function Estimate() {
   const options = of.options.reduce((a, o) => a + o.price, 0)
   const total = of.basePrice + options + of.transport + of.surcharge + of.craneSetFinish
   const groups = [...new Set(of.options.map(o => o.group))]
+  const [open, setOpen] = useState<string[]>([])
 
   return (
     <div className="space-y-4">
-      <Callout icon={<FileSignature size={14} />} className="max-w-4xl">
-        This is Merlin's estimate page. The order form is the selections plus the totals box. The Blue Sheet lives in the Cover Sheet panel underneath,
-        which never prints. When the customer signs, Merlin creates the project and seeds its budget from TinyMod's template.
+      <Callout icon={<FileSignature size={14} />}>
+        The estimate is your order form (base model + options). The Blue Sheet sits underneath, visible to TinyMod only. Signing creates the project budget.
         <Src refs={[{ s: 'CODE', c: 'BOMSummaryPanel.tsx:1694' }, { s: 'TPL' }]} className="ml-1" />
       </Callout>
 
@@ -38,18 +38,28 @@ export function Estimate() {
               <Src refs={of.baseRef} />
             </div>
           </div>
-          {groups.map(g => (
-            <div key={g}>
-              <div className="border-b border-line bg-ink-50/60 px-4 py-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-500">{g}</div>
-              {of.options.filter(o => o.group === g).map(o => (
-                <div key={o.label} className="flex items-center gap-3 border-b border-line px-4 py-1.5 text-[13px]">
-                  <span className="flex-1 text-ink-800">{o.label}</span>
-                  <Src refs={o.ref} />
-                  <span className={o.price < 0 ? 'w-24 text-right tnum text-ok-700' : 'w-24 text-right tnum text-ink-900'}>{money(o.price)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
+          {groups.map(g => {
+            const items = of.options.filter(o => o.group === g)
+            const isOpen = open.includes(g)
+            return (
+              <div key={g}>
+                <button onClick={() => setOpen(o => (o.includes(g) ? o.filter(x => x !== g) : [...o, g]))}
+                  className="flex w-full items-center gap-2 border-b border-line bg-ink-50/60 px-4 py-2 text-left hover:bg-ink-50">
+                  <ChevronRight size={13} className={isOpen ? 'rotate-90 text-ink-500 transition-transform' : 'text-ink-400 transition-transform'} />
+                  <span className="flex-1 text-2xs font-semibold uppercase tracking-wide text-ink-600">{g}</span>
+                  <span className="text-2xs text-ink-400">{items.length} option{items.length > 1 ? 's' : ''}</span>
+                  <span className="w-24 text-right text-[13px] tnum text-ink-800">{money(items.reduce((a, o) => a + o.price, 0))}</span>
+                </button>
+                {isOpen && items.map(o => (
+                  <div key={o.label} className="flex items-center gap-3 border-b border-line py-1.5 pl-10 pr-4 text-[13px]">
+                    <span className="flex-1 text-ink-800">{o.label}</span>
+                    <Src refs={o.ref} />
+                    <span className={o.price < 0 ? 'w-24 text-right tnum text-ok-700' : 'w-24 text-right tnum text-ink-900'}>{money(o.price)}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
           <div className="px-4 py-2 text-2xs text-ink-500">Options are passed through at the factory's price. TinyMod's margin sits in the base price.
             <Src refs={{ s: 'C0730', c: '18:46', note: '"our margin lives in the base price and all the options are the same price we get from the manufacturer"' }} className="ml-1" />
           </div>

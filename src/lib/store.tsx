@@ -3,10 +3,12 @@ import { newId, padTo, type Draw, type Line, type Project } from './budget'
 import type { Blue } from './blue'
 import { jobBlue, jobProject, jobSteps, type Step, type StepStatus } from '../data/job'
 
+import type { StepKey } from '../data/walkthrough'
+
 export interface Toast { id: number; text: string }
 export type BudgetTab = 'budget' | 'changeOrders' | 'draws' | 'conversation'
-export interface Nav { screen: 'estimate' | 'budget' | 'schedule' | 'coversheet'; budgetTab: BudgetTab }
-type Screen = 'estimate' | 'budget' | 'draws' | 'schedule'
+/** `step` is the walkthrough step (and screen); Budget and Draws are two tabs of the same Budget page. */
+export interface Nav { step: StepKey; budgetTab: BudgetTab }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 
@@ -15,15 +17,18 @@ function useStoreValue() {
   const [blue, setBlue] = useState<Blue>(() => clone(jobBlue))
   const [steps, setSteps] = useState<Step[]>(() => clone(jobSteps))
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [showSources, setShowSources] = useState(true)
+  const [showSources, setShowSources] = useState(false)
+  const [showNotes, setShowNotes] = useState(true)
+  const [showEmpty, setShowEmpty] = useState(false)
   const [drawer, setDrawer] = useState<null | 'questions' | 'sources'>(null)
   const [focusQ, setFocusQ] = useState<string | null>(null)
-  const [nav, setNav] = useState<Nav>({ screen: 'estimate', budgetTab: 'budget' })
+  const [nav, setNav] = useState<Nav>({ step: 'overview', budgetTab: 'budget' })
   const openQuestion = (id: string) => { setFocusQ(id); setDrawer('questions') }
-  const go = (screen: Screen) => {
-    setNav(screen === 'draws' ? { screen: 'budget', budgetTab: 'draws' } : screen === 'budget' ? { screen: 'budget', budgetTab: 'budget' } : { ...nav, screen })
+  const go = (step: StepKey) => {
+    setNav({ step, budgetTab: step === 'draws' ? 'draws' : 'budget' })
     window.scrollTo({ top: 0 })
   }
+  const setBudgetTab = (t: BudgetTab) => setNav({ step: t === 'draws' ? 'draws' : 'budget', budgetTab: t })
 
   const toast = (text: string) => {
     const id = Date.now() + Math.random()
@@ -76,7 +81,8 @@ function useStoreValue() {
 
   return { project, setProject, blue, setBlue, steps, setSteps, toasts, toast,
            updateLine, setDraws, fundFromContingency, setStepStatus, reset,
-           showSources, setShowSources, drawer, setDrawer, focusQ, openQuestion, nav, setNav, go }
+           showSources, setShowSources, showNotes, setShowNotes, showEmpty, setShowEmpty,
+           drawer, setDrawer, focusQ, openQuestion, nav, go, setBudgetTab }
 }
 
 type Store = ReturnType<typeof useStoreValue>

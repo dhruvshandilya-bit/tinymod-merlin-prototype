@@ -25,11 +25,9 @@ export function Schedule({ onOpenDraws }: { onOpenDraws: () => void }) {
 
   return (
     <div className="space-y-3">
-      <Callout icon={<Info size={14} />} className="max-w-4xl">
-        This is the project template already in Merlin <Src refs={[{ s: 'SCHED' }, { s: 'C1010', c: '17:21' }]} /> (uploaded on 10 Oct, using its placeholder dates). The budget lines hang off the same steps, so
-        a line's status is its task's status. Rows marked <b>Suggested</b> aren't in the template yet. They give the house and the draws a step to attach to:
-        release for production, loan closing, house ships, delivery, appliances, and C of O. Draws are still released by hand.
-        When a draw's step is marked done, Merlin tells you it's ready to request.
+      <Callout icon={<Info size={14} />}>
+        Your project template, as it sits in Merlin <Src refs={[{ s: 'SCHED' }, { s: 'C1010', c: '17:21' }]} />. Each step links to its budget line.
+        Rows marked <b>Suggested</b> <Q ids="Q16" /> give the house and the draws a step to hang off; when a draw's step is done, Merlin says it's ready to request.
       </Callout>
 
       {ready.map(({ d, i }) => (
@@ -42,12 +40,12 @@ export function Schedule({ onOpenDraws }: { onOpenDraws: () => void }) {
       ))}
 
       <div className="overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full min-w-[1240px] border-collapse">
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr>
               {['#', 'Task', 'Budget line', 'Start', 'End', 'Status', 'Assignee', 'Timeline'].map(h => (
                 <th key={h} className={cn('border-b border-line bg-ink-50 px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-ink-500',
-                  h === 'Task' && 'min-w-[300px]', h === 'Budget line' && 'min-w-[320px]')}>{h}</th>
+                  h === 'Task' && 'min-w-[230px]', h === 'Budget line' && 'min-w-[250px]')}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -69,7 +67,7 @@ export function Schedule({ onOpenDraws }: { onOpenDraws: () => void }) {
                     {ls.length ? ls.map(l => (
                       <div key={l.id} className="flex items-center gap-1.5">
                         <span className="rounded bg-ink-100 px-1 text-[10px] text-ink-500">{l.code}</span>
-                        <span className="truncate">{l.name}</span>
+                        <span className="max-w-[150px] truncate" title={l.name}>{l.name}</span>
                         <span className="ml-auto tnum text-ink-500">{money(l.approved, 0)}</span>
                         {(al[l.id] ?? []).map((v, i) => v ? <span key={i} className="rounded bg-ink-50 px-1 text-[10px] text-ink-500">D{i + 1}</span> : null)}
                       </div>
@@ -87,7 +85,7 @@ export function Schedule({ onOpenDraws }: { onOpenDraws: () => void }) {
                     </span>
                   </td>
                   <td className="whitespace-nowrap border-b border-line px-3 py-1.5 text-2xs text-ink-600">{s.assignee ?? <span className="text-ink-300">No assignee</span>}</td>
-                  <td className="w-[220px] border-b border-line px-3 py-1.5">
+                  <td className="w-[130px] border-b border-line px-3 py-1.5">
                     <div className="relative h-2 rounded bg-ink-50">
                       <div className={cn('absolute top-0 h-2 rounded', s.status === 'done' ? 'bg-ok-500' : s.status === 'in_progress' ? 'bg-warn-500' : s.suggested ? 'bg-brand-200' : 'bg-brand-300')}
                         style={{ left: `${((day(s.start) - min) / span) * 100}%`, width: `${Math.max(1.2, ((day(s.end) - day(s.start) + 1) / span) * 100)}%` }} />

@@ -25,7 +25,7 @@ export const STATUS: Record<StepStatus, { label: string; dot: string }> = {
 
 /** The project Budget tab's table (Budget Sections in Merlin), seeded from TinyMod's template and filled from the PM and draw sheets. */
 export function CostingSheet() {
-  const { project, setProject, steps, blue, updateLine, fundFromContingency } = useStore()
+  const { project, setProject, steps, blue, updateLine, fundFromContingency, showEmpty, setShowEmpty } = useStore()
   const [showBase, setShowBase] = useState(false)
   const lines = resolve(project)
   const drawn = lineDrawn(project)
@@ -35,7 +35,9 @@ export function CostingSheet() {
   const overBy = (l: Line) =>
     inLoan(l) && !['gcfee', 'contingency', 'item'].includes(l.kind) ? Math.max(0, cents(l.amount - l.approved - (covered[l.id] ?? 0))) : 0
   const cont = contingencyOriginal(project)
-  const groups = Object.keys(COST_CODES).map(code => ({ code, name: COST_CODES[code], lines: lines.filter(l => l.code === code) }))
+  const isEmpty = (l: Line) => l.kind !== 'gcfee' && l.kind !== 'contingency' && l.amount === 0 && l.approved === 0
+  const emptyCount = lines.filter(isEmpty).length
+  const groups = Object.keys(COST_CODES).map(code => ({ code, name: COST_CODES[code], lines: lines.filter(l => l.code === code && (showEmpty || !isEmpty(l))) }))
   const loanLines = lines.filter(inLoan)
   const tot = {
     amount: cents(loanLines.reduce((a, l) => a + l.amount, 0)),
@@ -55,20 +57,22 @@ export function CostingSheet() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start gap-3">
-        <Callout icon={<Info size={14} />} className="max-w-3xl flex-1">
-          The costing sheet is the project's Budget tab. Line names and cost codes come from the TinyMod template already in Merlin <Src refs={{ s: 'TPL' }} />.
-          The amounts come from the PM sheet <Src refs={{ s: 'PM', c: 'col E' }} /> and the draw sheet <Src refs={{ s: 'DRAW', c: 'col C' }} />.
-          Each line's status comes from its schedule task.
+        <Callout icon={<Info size={14} />} className="flex-1">
+          Your costing sheet, as the project's Budget tab: your template's lines <Src refs={{ s: 'TPL' }} />, with the amounts from your sheets <Src refs={[{ s: 'PM', c: 'col E' }, { s: 'DRAW', c: 'col C' }]} />.
         </Callout>
+        <label className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-2xs text-ink-600">
+          <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)} className="accent-brand-400" />
+          Show $0 template lines ({emptyCount})
+        </label>
         <Button variant="outline" onClick={() => exportCosting(project, steps)}><Download size={13} /> Export to Excel</Button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full min-w-[1180px] border-collapse">
+        <table className="w-full min-w-[940px] border-collapse">
           <thead>
             <tr>
-              {['Cost code / line', 'Task', 'Contractor', 'Stage', 'Total est. (bid)', 'Bank approved', 'Actuals (paid)', 'Drawn', 'Available', ''].map((h, i) => (
-                <th key={i} className={cn('border-b border-line bg-ink-50 px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-ink-500', i >= 4 && i <= 8 && 'text-right')}>{h}</th>
+              {['Cost code / line', 'Task', 'Stage', 'Total est. (bid)', 'Bank approved', 'Actuals (paid)', 'Drawn', 'Available'].map((h, i) => (
+                <th key={i} className={cn('border-b border-line bg-ink-50 px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-ink-500', i >= 3 && 'text-right')}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -78,12 +82,12 @@ export function CostingSheet() {
               return (
                 <React.Fragment key={g.code}>
                   <tr className="bg-ink-50/60">
-                    <td colSpan={4} className="border-b border-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-600">
+                    <td colSpan={3} className="border-b border-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-600">
                       <span className="mr-2 rounded bg-white px-1.5 py-0.5 text-ink-500 ring-1 ring-line">{g.code}</span>{g.name}
                     </td>
                     <td className="border-b border-line px-3 py-1.5 text-right text-2xs font-semibold tnum text-ink-600">{money(sub.reduce((a, l) => a + l.amount, 0))}</td>
                     <td className="border-b border-line px-3 py-1.5 text-right text-2xs font-semibold tnum text-ink-600">{money(sub.reduce((a, l) => a + l.approved, 0))}</td>
-                    <td colSpan={4} className="border-b border-line" />
+                    <td colSpan={3} className="border-b border-line" />
                   </tr>
                   {g.lines.map(l => (
                     <Row key={l.id} l={l} step={l.stepId ? stepById[l.stepId] : undefined} gap={overBy(l)} drawn={drawn[l.id]?.drawn ?? 0}
@@ -104,7 +108,7 @@ export function CostingSheet() {
                   ))}
                   {g.code === '8000' && showBase && (
                     <tr>
-                      <td colSpan={10} className="border-b border-line bg-brand-50/40 px-4 py-3">
+                      <td colSpan={8} className="border-b border-line bg-brand-50/40 px-4 py-3">
                         <div className="mb-2 flex flex-wrap items-center gap-2 text-2xs font-semibold uppercase tracking-wide text-brand-500">
                           GC fee base: the lines TinyMod charges the fee on <Q ids="Q3" />
                         </div>
@@ -128,7 +132,7 @@ export function CostingSheet() {
               )
             })}
             <tr className="bg-brand-50/50">
-              <td colSpan={10} className="border-b border-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-500">
+              <td colSpan={8} className="border-b border-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-500">
                 <span className="mr-2 rounded bg-white px-1.5 py-0.5 ring-1 ring-brand-200">9000</span>Margin & Internal
                 <span className="ml-2 inline-flex items-center gap-1 normal-case"><EyeOff size={11} /> hidden from the customer · not in contract</span>
                 <Q ids="Q17" className="ml-2" />
@@ -140,21 +144,20 @@ export function CostingSheet() {
                   <div className="font-medium">{h.name}</div>
                   <Src refs={h.refs} />
                 </td>
-                <td colSpan={3} className="border-b border-line px-3 py-1.5 text-2xs text-ink-400">Copied from the estimate's Blue Sheet at signing</td>
+                <td colSpan={2} className="border-b border-line px-3 py-1.5 text-2xs text-ink-400">From the estimate's Blue Sheet</td>
                 <td className="border-b border-line px-3 py-1.5 text-right text-[13px] tnum">{money(h.v)}</td>
-                <td colSpan={5} className="border-b border-line" />
+                <td colSpan={4} className="border-b border-line" />
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="bg-ink-50">
-              <td colSpan={4} className="px-3 py-2.5 text-[13px] font-semibold text-ink-950">Total in the loan <Src refs={{ s: 'DRAW', c: 'C40' }} /></td>
+              <td colSpan={3} className="px-3 py-2.5 text-[13px] font-semibold text-ink-950">Total in the loan <Src refs={{ s: 'DRAW', c: 'C40' }} /></td>
               <td className="px-3 py-2.5 text-right text-[13px] font-semibold tnum">{money(tot.amount)}</td>
               <td className={cn('px-3 py-2.5 text-right text-[13px] font-semibold tnum', tot.approved !== project.loan && 'text-danger-600')}>{money(tot.approved)}</td>
               <td className="px-3 py-2.5 text-right text-[13px] font-semibold tnum">{money(tot.paid)}</td>
               <td className="px-3 py-2.5 text-right text-[13px] font-semibold tnum">{money(tot.drawn)}</td>
               <td className="px-3 py-2.5 text-right text-[13px] font-semibold tnum">{money(tot.approved - tot.drawn)}</td>
-              <td />
             </tr>
           </tfoot>
         </table>
@@ -180,6 +183,7 @@ function Row({ l, step, gap, drawn, onPatch, onFund, extra }: {
           {empty && <span className="text-2xs font-normal text-ink-400">template line, $0 on this job</span>}
           <Q ids={l.qs} />
         </div>
+        {l.contractor && !empty && <div className="text-2xs text-ink-500">{l.contractor}</div>}
         <Src refs={l.refs} className="mt-0.5" />
         {extra}
         {l.note && !empty && <div className="mt-0.5 text-2xs text-ink-400">{l.note}</div>}
@@ -199,7 +203,6 @@ function Row({ l, step, gap, drawn, onPatch, onFund, extra }: {
           </span>
         ) : '—'}
       </td>
-      <td className="border-b border-line px-3 py-2 align-top text-2xs text-ink-600">{l.contractor ?? ''}</td>
       <td className="border-b border-line px-3 py-2 align-top">
         {!empty && (
           <button disabled={computed} onClick={() => onPatch({ stage: nextStage[l.stage] })} title={!computed ? 'Click: rough → bid → final' : undefined}>
@@ -221,7 +224,6 @@ function Row({ l, step, gap, drawn, onPatch, onFund, extra }: {
       </td>
       <td className="border-b border-line px-3 py-2 text-right align-top text-[13px] tnum text-ink-700">{outside ? '' : money(drawn)}</td>
       <td className="border-b border-line px-3 py-2 text-right align-top text-[13px] tnum text-ink-800">{outside ? '' : money(l.approved - drawn)}</td>
-      <td className="border-b border-line px-2 py-2 align-top" />
     </tr>
   )
 }
