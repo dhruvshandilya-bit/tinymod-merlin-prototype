@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, Info, Lock, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { allocate, contingencyOriginal, drawSummaries, houseDeposit, inLoan, lineDrawn, padTo, resolve, warnings, type Alloc, type Draw, type DrawStatus, type Line } from '../lib/budget'
+import { COST_CODES, allocate, contingencyOriginal, drawSummaries, houseDeposit, inLoan, lineDrawn, padTo, resolve, warnings, type Alloc, type Draw, type DrawStatus, type Line } from '../lib/budget'
 import { cents, cn, money, pct, shortDate } from '../lib/util'
 import { Badge, Button, Callout, NumInput } from './ui'
 import { Q, Src } from './refs'
@@ -29,12 +29,36 @@ export function Draws() {
 
   const patchDraw = (i: number, patch: Partial<Draw>) => setDraws(project.draws.map((d, k) => (k === i ? { ...d, ...patch } : d)))
 
+  const billTo = project.billTo === 'customer' ? `${project.customer} (customer)` : `${project.bank} (lender)`
   const advance = (i: number) => {
     const d = project.draws[i]
-    if (d.status === 'planned') { patchDraw(i, { status: 'requested' }); toast(`${d.name} requested from ${project.bank}: ${money(sums[i].allocated)}.`) }
+    if (d.status === 'planned') { patchDraw(i, { status: 'requested' }); toast(`${d.name} requested: ${money(sums[i].allocated)}.`) }
     else if (d.status === 'requested') {
       patchDraw(i, { status: 'funded', date: TODAY })
-      toast(`${d.name} funded. Merlin raised one invoice to ${project.bank} for ${money(sums[i].allocated)} with ${sums[i].lines} lines tagged by cost code, so the budget's Drawn and Available columns are up to date.`)
+      toast(`${d.name} funded. Merlin raised one invoice to ${billTo} for ${money(sums[i].allocated)}, with ${sums[i].lines} lines tagged by cost code. The budget's Drawn and Available columns are up to date.`)
+    }
+  }
+
+  // Q5: draw by line or by whole cost code. The cost-code view sets one rule for every line in the code.
+  const [view, setView] = useState<'lines' | 'codes'>('lines')
+  const ruleOf = (l: Line) => (l.alloc.mode === 'pin' ? `pin:${l.alloc.draw}` : l.alloc.mode)
+  const codeRows = Object.keys(COST_CODES).map(code => {
+    const ls = lines.filter(l => l.code === code)
+    const rules = [...new Set(ls.filter(l => l.kind !== 'contingency').map(ruleOf))]
+    return {
+      code, ls,
+      rule: rules.length === 1 ? rules[0] : rules.length === 0 ? 'none' : 'mixed',
+      allHouse: ls.every(l => l.kind === 'house'),
+      locked: ls.some(l => (dr[l.id]?.lockedDraws.length ?? 0) > 0),
+      approved: cents(ls.reduce((a, l) => a + l.approved, 0)),
+      perDraw: project.draws.map((_, i) => cents(ls.reduce((a, l) => a + ((al[l.id] ?? [])[i] ?? 0), 0))),
+      drawn: cents(ls.reduce((a, l) => a + (dr[l.id]?.drawn ?? 0), 0)),
+    }
+  }).filter(x => x.ls.length)
+  const setCodeAlloc = (code: string, value: string) => {
+    for (const l of lines.filter(x => x.code === code && x.kind !== 'contingency' && !(dr[x.id]?.lockedDraws.length))) {
+      if (value === 'house' && l.kind !== 'house') continue
+      setAlloc(l, value)
     }
   }
 
@@ -101,6 +125,8 @@ export function Draws() {
             <span>{n} draws: {project.draws.map(d => pct(d.capPct, 0)).join(' / ')}</span>
             <span className="text-ink-300">·</span>
             <span>House: {pct(project.house.depositPct, 0)} deposit in {project.draws[project.house.depositDraw]?.name}, balance in {project.draws[project.house.balanceDraw]?.name}</span>
+            <span className="text-ink-300">·</span>
+            <span>Invoices to the {project.billTo}</span>
           </div>
           <button onClick={() => setSetupOpen(o => !o)} className="ml-auto inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-2xs font-medium text-ink-700 hover:bg-ink-50">
             <Settings2 size={12} /> {setupOpen ? 'Close setup' : 'Edit setup'}
@@ -122,6 +148,12 @@ export function Draws() {
               <span className="text-ink-600">Lender</span>
               <input value={project.bank} disabled={!editable} onChange={e => setProject(p => ({ ...p, bank: e.target.value }))}
                 className="h-7 w-44 rounded-md border border-line px-2 text-[13px] disabled:bg-ink-50" />
+              <span className="text-ink-600">Invoice to</span>
+              <select value={project.billTo} onChange={e => setProject(p => ({ ...p, billTo: e.target.value as any }))}
+                className="h-7 rounded-md border border-line bg-white px-1 text-2xs text-ink-700">
+                <option value="customer">Customer</option><option value="lender">Lender</option>
+              </select>
+              <Q ids="Q4" />
             </div>
             <table className="w-full text-[13px]">
               <thead>
@@ -214,7 +246,19 @@ export function Draws() {
         <table className="w-full border-collapse" style={{ minWidth: 560 + n * 120 }}>
           <thead>
             <tr>
-              <Hd className="min-w-[180px]"><span className="inline-flex items-center gap-1.5">Line <Q ids="Q5" /></span></Hd>
+              <Hd className="min-w-[180px]">
+                <span className="inline-flex items-center gap-1.5 normal-case">
+                  <span className="inline-flex rounded-md border border-line bg-white p-0.5">
+                    {(['lines', 'codes'] as const).map(v => (
+                      <button key={v} onClick={() => setView(v)}
+                        className={cn('rounded px-1.5 py-0.5 text-[10.5px] font-semibold', view === v ? 'bg-ink-900 text-white' : 'text-ink-500 hover:bg-ink-100')}>
+                        {v === 'lines' ? 'Lines' : 'Cost codes'}
+                      </button>
+                    ))}
+                  </span>
+                  <Q ids="Q5" />
+                </span>
+              </Hd>
               <Hd>How it's drawn</Hd>
               <Hd right className="whitespace-nowrap">Bank approved</Hd>
               {project.draws.map((d, i) => {
@@ -251,7 +295,40 @@ export function Draws() {
             </tr>
           </thead>
           <tbody>
-            {lines.map(l => {
+            {view === 'codes' && codeRows.map(c => (
+              <tr key={c.code}>
+                <td className="border-b border-line px-3 py-1.5 text-[13px]">
+                  <span className="mr-2 rounded bg-ink-100 px-1 py-0.5 text-[10px] text-ink-500">{c.code}</span>
+                  <span className="font-medium text-ink-900">{COST_CODES[c.code]}</span>
+                  <div className="text-2xs text-ink-500">{c.ls.length} line{c.ls.length > 1 ? 's' : ''}</div>
+                </td>
+                <td className="border-b border-line px-3 py-1.5">
+                  {c.code === '8000' && c.ls.some(l => l.kind === 'contingency') && c.rule === 'none' ? <span className="text-2xs text-ink-400">Held back</span> : (
+                    <span className="inline-flex items-center gap-1">
+                      <select value={c.rule} disabled={c.locked} onChange={e => setCodeAlloc(c.code, e.target.value)}
+                        className="h-7 max-w-[140px] rounded-md border border-line bg-white px-1 text-2xs text-ink-700 disabled:bg-ink-50 disabled:text-ink-500">
+                        {c.rule === 'mixed' && <option value="mixed" disabled>Mixed</option>}
+                        {c.allHouse && <option value="house">House rule</option>}
+                        {project.draws.map((d, i) => <option key={d.id} value={`pin:${i}`}>{d.name}</option>)}
+                        <option value="track">Track %</option>
+                        {c.rule === 'split' && <option value="split">Split %</option>}
+                        {c.rule === 'none' && <option value="none">Held back</option>}
+                      </select>
+                      {c.locked && <span title="Part of this code is already in a funded draw, so it is locked."><Lock size={11} className="text-ink-400" /></span>}
+                    </span>
+                  )}
+                </td>
+                <td className="border-b border-line px-3 py-1.5 text-right text-[13px] tnum text-ink-900">{money(c.approved)}</td>
+                {project.draws.map((d, i) => (
+                  <td key={d.id} className={cn('border-b border-line px-3 py-1.5 text-right text-[13px] tnum', d.status === 'funded' && 'bg-ok-50/50')}>
+                    {c.perDraw[i] ? <span className={d.status === 'funded' ? 'text-ok-700' : 'text-ink-800'}>{money(c.perDraw[i])}</span> : <span className="text-ink-300">·</span>}
+                  </td>
+                ))}
+                <td className="border-b border-line px-3 py-1.5 text-right text-[13px] tnum text-ink-900">{money(c.drawn)}</td>
+                <td className="border-b border-line px-3 py-1.5 text-right text-[13px] tnum text-ink-700">{money(c.approved - c.drawn)}</td>
+              </tr>
+            ))}
+            {view === 'lines' && lines.map(l => {
               const row = al[l.id] ?? []
               const locked = (dr[l.id]?.lockedDraws.length ?? 0) > 0
               const value = l.alloc.mode === 'pin' ? `pin:${l.alloc.draw}` : l.alloc.mode
@@ -309,7 +386,7 @@ export function Draws() {
             {editable && (
               <tr>
                 <td colSpan={3} className="px-3 py-2.5 text-2xs text-ink-500">
-                  Request a draw, then mark it funded when the bank pays. Funding raises the invoice to the bank <Q ids="Q4" />, linked to a payment milestone so the budget's
+                  Request a draw, then mark it funded when the money comes in. Funding raises the invoice to the {project.billTo} <Q ids="Q4" />, linked to a payment milestone so the budget's
                   Drawn column fills <Src refs={{ s: 'CODE', c: 'BudgetService.kt:1009', note: 'Drawn only counts receivables linked to a payment milestone, and only cash received' }} />.
                 </td>
                 {project.draws.map((d, i) => (

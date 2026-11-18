@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { allocate, contingencyOriginal, inLoan, resolve, type Project } from './budget'
-import { calcBlue, serviceAmount, type Blue } from './blue'
+import { serviceAmount, type Blue } from './blue'
 import type { Step } from '../data/job'
 
 const col = (i: number) => XLSX.utils.encode_col(i)
@@ -111,50 +111,43 @@ export function exportCosting(p: Project, steps: Step[]) {
   XLSX.writeFile(wb, `Project Management & Cost Model - ${p.customer}.xlsx`)
 }
 
-/** The Blue Sheet "Project Totals" block, with the master's own formulas. */
-export function exportBlue(b: Blue, customer: string, orderForm: number) {
-  const r = calcBlue(b)
+/** The Blue Sheet as the split of the final estimate (Q1, Q17), with live formulas. One-off is gone (Q14). */
+export function exportBlue(b: Blue, customer: string, estimate: number) {
   const aoa: any[][] = [
     ['TINYMOD MODULAR BLUE SHEET', '', 'INTERNAL ONLY'],
     [customer],
     [],
+    ['Estimate total (final)', estimate],
+    [],
     ['TM (wholesale)', b.wholesale],
     ['Uni-Frame', b.uniFrame],
     ['Modular totals'],
-    [],
     ['Additional project services', '', '%'],
     ...b.services.map(s => [s.name, serviceAmount(b, s), s.mode === 'pctTM' ? s.value : '']),
     ['Project services'],
-    [],
     ['Sales tax', b.salesTax],
     ['Sub totals'],
     ['Tariff', '', b.tariffPct],
-    ['TinyMod margin', '', b.marginPct],
-    ['One-off project', '', b.oneOffPct],
-    ['RETAIL SALES GRAND TOTAL'],
+    ['TinyMod margin (estimate − sub totals − tariff)'],
+    ['Margin % of sub totals'],
     ['Frame return credit', b.frameCredit],
     ['TINYMOD NET'],
-    [],
-    ['Signed order form', orderForm],
-    ['Difference'],
   ]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
-  const svcStart = 9, svcEnd = 8 + b.services.length
-  b.services.forEach((s, k) => { if (s.mode === 'pctTM') setFormula(ws, `B${svcStart + k}`, `C${svcStart + k}*B4`) })
   const R = (label: string) => aoa.findIndex(x => x[0] === label) + 1
-  setFormula(ws, `B${R('Modular totals')}`, 'B4+B5')
+  const svcStart = R('Additional project services') + 1, svcEnd = svcStart + b.services.length - 1
+  b.services.forEach((s, k) => { if (s.mode === 'pctTM') setFormula(ws, `B${svcStart + k}`, `C${svcStart + k}*B${R('TM (wholesale)')}`) })
+  setFormula(ws, `B${R('Modular totals')}`, `B${R('TM (wholesale)')}+B${R('Uni-Frame')}`)
   setFormula(ws, `B${R('Project services')}`, `SUM(B${svcStart}:B${svcEnd})`)
   setFormula(ws, `B${R('Sub totals')}`, `B${R('Sales tax')}+B${R('Modular totals')}+B${R('Project services')}`)
-  setFormula(ws, `B${R('Tariff')}`, `B4*C${R('Tariff')}`)
-  setFormula(ws, `B${R('TinyMod margin')}`, `C${R('TinyMod margin')}*B${R('Sub totals')}`)
-  setFormula(ws, `B${R('One-off project')}`, `B${R('TinyMod margin')}*C${R('One-off project')}`)
-  setFormula(ws, `B${R('RETAIL SALES GRAND TOTAL')}`, `SUM(B${R('Sub totals')}:B${R('One-off project')})`)
-  setFormula(ws, `B${R('TINYMOD NET')}`, `B${R('TinyMod margin')}+B${R('One-off project')}+B${R('Frame return credit')}`)
-  setFormula(ws, `B${R('Difference')}`, `B${R('RETAIL SALES GRAND TOTAL')}-B${R('Signed order form')}`)
-  for (const k of Object.keys(ws)) if (/^B\d+$/.test(k) && typeof ws[k].v === 'number') ws[k].z = money
+  setFormula(ws, `B${R('Tariff')}`, `B${R('TM (wholesale)')}*C${R('Tariff')}`)
+  const m = R('TinyMod margin (estimate − sub totals − tariff)')
+  setFormula(ws, `B${m}`, `B${R('Estimate total (final)')}-B${R('Sub totals')}-B${R('Tariff')}`)
+  setFormula(ws, `B${R('Margin % of sub totals')}`, `B${m}/B${R('Sub totals')}`, '0.00%')
+  setFormula(ws, `B${R('TINYMOD NET')}`, `B${m}+B${R('Frame return credit')}`)
+  for (const k of Object.keys(ws)) if (/^B\d+$/.test(k) && typeof ws[k].v === 'number' && !ws[k].z) ws[k].z = money
   for (const k of Object.keys(ws)) if (/^C\d+$/.test(k) && typeof ws[k].v === 'number') ws[k].z = '0.0%'
-  ws['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 10 }]
-  void r
+  ws['!cols'] = [{ wch: 44 }, { wch: 16 }, { wch: 10 }]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'TINYMOD')
   XLSX.writeFile(wb, `Blue Sheet - ${customer}.xlsx`)

@@ -70,6 +70,8 @@ export interface Draw {
 export interface Project {
   customer: string
   bank: string
+  /** Who draw invoices go to (Q4: mostly the customer). */
+  billTo: 'customer' | 'lender'
   loan: number
   gcRate: number
   draws: Draw[]

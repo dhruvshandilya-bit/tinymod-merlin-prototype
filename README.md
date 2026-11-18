@@ -17,10 +17,13 @@ Data is one TinyMod GC job. The homeowner is renamed "Rowan Residence". Every am
 - **Presenter notes** panel on the right for each step: where it lives in Merlin, what it replaces, what to say, what to click, "If they ask" answers, and the open questions to raise. The script is in `src/data/walkthrough.ts`.
 - **Kept out of the way until needed:** source chips (off by default; "Show sources" turns them on), $0 template lines ("Show $0 template lines"), the draw setup ("Edit setup"), and the estimate option groups (click a group to expand it).
 
+## Source sheets inside the prototype
+Tap any source chip, or a file in "Where the data came from", to open that sheet in the built-in viewer. It opens at the referenced cell, and clicking a cell shows its formula. The six files are exported to `src/data/sheets/*.json` by a redaction script that strips the homeowner's name, address, email and phone and fails if any are left: Order Form #7, Blue Sheet (this job), Blue Sheet master, PM sheet, Draw sheet, and the Merlin budget template. Call transcripts are not published; a chip shows only the quoted line.
+
 ## Where the data came from, and the open questions
 - **Source chips** (off by default): every number carries a chip such as "PM sheet E33" or "Draw sheet C17". Hover a chip for the file, tab, cell and note. Chip colours: green = client sheet, purple = Merlin template or code, blue = call transcript, amber = prototype assumption.
 - **Where the data came from**: a panel listing each source file, what was taken from it, and which questions depend on it.
-- **Open questions (19)**: each one has why it matters, what the prototype assumes until it's answered, its sources, and a "Show me" link. They can be filtered by who must answer (TinyMod or Merlin team). Red Q-markers on screen open the matching question.
+- **Questions (19: 9 open, 10 answered)**: answered ones show the answer and what it changed; open ones show what the prototype assumes until it's answered, its sources, and a "Show me" link. They can be filtered by who must answer (TinyMod or Merlin team). Red Q-markers on screen open the matching question.
 - Registers: `src/data/sources.ts` and `src/data/questions.ts`. Every figure quoted in a question is checked by a test.
 
 ```

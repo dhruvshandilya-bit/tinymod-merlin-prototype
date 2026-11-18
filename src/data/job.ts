@@ -1,5 +1,5 @@
 import type { Project, Line } from '../lib/budget'
-import type { Blue } from '../lib/blue'
+import { solveMargin, type Blue } from '../lib/blue'
 import { r, type Ref } from './sources'
 
 /**
@@ -44,11 +44,11 @@ export const jobLines: Line[] = [
   L({ id: 'planreview', code: '1000', name: '3rd-Party Plan Approval / Plan Review', amount: 0, refs: [r('PM', 'B19:B20')] }),
 
   // 2000 Modular Unit
-  L({ id: 'pa', code: '2000', name: 'Modular Unit Total (base + options + transport)', amount: 168992, kind: 'house', gcBase: false, stage: 'final',
+  L({ id: 'pa', code: '2000', name: 'Modular Unit Total (base + options + transport)', amount: 169987, kind: 'house', gcBase: false, stage: 'final',
       stepId: 'x-pa', alloc: { mode: 'house' }, contractor: 'TinyMod, LLC',
-      note: 'Held at house & options only; transport is in 6000 so it is not counted twice',
-      refs: [r('DRAW', 'C8', 'MOD purchase agreement'), r('PM', 'E15', '$177,552 incl. transport'), r('TPL', '2000', 'fromEstimateRetail')],
-      allocRef: r('DRAW', 'E8 / F8', '$62,143 in draw 1, $106,849 in draw 2'), qs: ['Q1', 'Q2'] }),
+      note: 'The estimate total (final). Transport is its own 6000 line, so it is counted once',
+      refs: [r('OF7', 'AB77', 'estimate total, final (Q1)'), r('DRAW', 'C8', 'bank sheet had $168,992, an earlier version'), r('TPL', '2000', 'fromEstimateRetail')],
+      allocRef: r('DRAW', 'E8 / F8', '35% deposit in draw 1, balance in draw 2 (as the sheet split it)'), qs: ['Q1', 'Q2'] }),
 
   // 3000 Earthwork & Site Prep
   L({ id: 'profile', code: '3000', name: 'Profile Hole Excavation', amount: 500, stage: 'final', stepId: 's2', alloc: { mode: 'pin', draw: 0 },
@@ -128,6 +128,7 @@ export const jobLines: Line[] = [
 export const jobProject: Project = {
   customer: PROJECT_META.customer,
   bank: 'Construction lender',
+  billTo: 'customer',
   loan: 443000,
   gcRate: 0.1,
   draws: [
@@ -141,14 +142,14 @@ export const jobProject: Project = {
   lines: jobLines,
 }
 
-/** This job's own Blue Sheet. It predates the Merlin AI line, so that service is set to 0%. */
-export const jobBlue: Blue = {
+/** This job's Blue Sheet exactly as sent (no Merlin AI line yet, margin typed at 15.3%). Kept to test the sheet's formulas. */
+export const jobBlueAsSent: Blue = {
   wholesale: 109857.55,
   uniFrame: 0,
   services: [
     { id: 'viz', name: 'VIZ Graphics', payee: 'Eric', mode: 'fixed', value: 20000 },
     { id: 'mbi', name: 'MBi Building Systems', payee: 'Kevin', mode: 'fixed', value: 20000 },
-    { id: 'merlin', name: 'Merlin AI (mod total)', payee: 'Merlin', mode: 'pctTM', value: 0 },
+    { id: 'merlin', name: 'Merlin AI', payee: 'Merlin', mode: 'pctTM', value: 0 },
   ],
   salesTax: 2000,
   tariffPct: 0,
@@ -156,6 +157,16 @@ export const jobBlue: Blue = {
   oneOffPct: 0,
   frameCredit: 3000,
 }
+
+/** The estimate total is final (Q1): base price + options on Order Form #7. */
+export const ESTIMATE_TOTAL = 158159 + 11828
+
+/** The Blue Sheet with the answers applied: Merlin AI on every job (Q12), one-off dropped (Q14), and the margin
+ *  set to whatever is left of the final estimate (Q1), since the base price already carries TinyMod's margin. */
+export const jobBlue: Blue = (() => {
+  const b: Blue = { ...jobBlueAsSent, services: jobBlueAsSent.services.map(x => (x.id === 'merlin' ? { ...x, value: 0.01 } : x)) }
+  return { ...b, marginPct: solveMargin(b, ESTIMATE_TOTAL) }
+})()
 
 export const BLUE_REFS: Record<string, Ref[]> = {
   wholesale: [r('BLUE', 'G29')],

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Hand, Landmark, Lock, MessageCircleQuestion, CalendarRange, FileSpreadsheet, ClipboardList, Megaphone, MapPin, PanelRightClose } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Hand, Landmark, Lock, MessageCircleQuestion, CalendarRange, FileSpreadsheet, ClipboardList, Megaphone, MapPin, PanelRightClose } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { WALK, type StepKey } from '../data/walkthrough'
 import { QUESTIONS } from '../data/questions'
@@ -33,6 +33,9 @@ export function NotesPanel() {
   const s = WALK[i]
   const prev = WALK[i - 1]
   const next = WALK[i + 1]
+  const qs = s.questions.map(id => QUESTIONS.find(x => x.id === id)!)
+  const asks = qs.filter(q => q.status !== 'answered')
+  const decided = qs.filter(q => q.status === 'answered')
   return (
     <aside className="sticky top-[49px] hidden h-[calc(100vh-49px)] w-[360px] shrink-0 flex-col border-l border-line bg-white lg:flex">
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
@@ -55,13 +58,17 @@ export function NotesPanel() {
         <Block icon={MessageCircleQuestion} title="If they ask">
           <div className="space-y-1">{s.faq.map((f, k) => <Faq key={k} q={f.q} a={f.a} />)}</div>
         </Block>
-        {s.questions.length > 0 && (
-          <Block icon={ClipboardList} title="Ask them (open questions on this screen)">
+        {asks.length > 0 && (
+          <Block icon={ClipboardList} title="Ask them (still open)">
             <div className="space-y-1.5">
-              {s.questions.map(id => {
-                const q = QUESTIONS.find(x => x.id === id)!
-                return <div key={id} className="flex items-start gap-1.5"><Q ids={id} /><span>{q.title}</span></div>
-              })}
+              {asks.map(q => <div key={q.id} className="flex items-start gap-1.5"><Q ids={q.id} /><span>{q.title}{q.status === 'partly' && <span className="text-ink-500"> (part answered)</span>}</span></div>)}
+            </div>
+          </Block>
+        )}
+        {decided.length > 0 && (
+          <Block icon={CheckCircle2} title="Already decided (tell them)">
+            <div className="space-y-1.5">
+              {decided.map(q => <div key={q.id} className="flex items-start gap-1.5"><Q ids={q.id} /><span>{q.answer}</span></div>)}
             </div>
           </Block>
         )}
@@ -140,7 +147,7 @@ export function Overview() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[12.5px] text-ink-600">
-        <span><b className="text-ink-900">Tip:</b> "Show sources" puts the sheet and cell on every number. "Open questions" lists what we still need from you, and why.</span>
+        <span><b className="text-ink-900">Tip:</b> "Show sources" puts the sheet and cell on every number; tap a chip to open that sheet at the cell. "Open questions" lists what we still need and what's already decided.</span>
         <button onClick={() => go('estimate')} className="ml-auto flex h-8 items-center gap-1 rounded-lg bg-brand-400 px-3 font-medium text-white hover:bg-brand-500">Start: Estimate <ChevronRight size={13} /></button>
       </div>
     </div>

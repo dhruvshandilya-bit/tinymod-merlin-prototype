@@ -51,3 +51,21 @@ export function solveMargin(b: Blue, targetRetail: number) {
   if (r.subtotal <= 0) return b.marginPct
   return (targetRetail - r.subtotal - r.tariff) / (r.subtotal * (1 + b.oneOffPct))
 }
+
+/**
+ * The estimate is final (Q1) and the base price already carries TinyMod's margin, so the Blue Sheet reads the
+ * other way round: estimate total − factory − services − tax − tariff = TinyMod's margin. This is the profit
+ * split of the house price (Q17), not an extra cost.
+ */
+export function splitFromEstimate(b: Blue, estimate: number) {
+  const r = calcBlue({ ...b, marginPct: 0, oneOffPct: 0 })
+  const margin = estimate - r.subtotal - r.tariff
+  return {
+    ...r,
+    estimate,
+    margin,
+    pctOfSubtotal: r.subtotal ? margin / r.subtotal : 0,
+    pctOfFactory: b.wholesale ? margin / b.wholesale : 0,
+    net: margin + b.frameCredit,
+  }
+}

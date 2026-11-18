@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { AlertTriangle, Download, EyeOff, Info, Link2, SlidersHorizontal } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { COST_CODES, contingencyOriginal, gcBase, inLoan, lineDrawn, resolve, type Line, type Stage } from '../lib/budget'
-import { calcBlue, serviceAmount } from '../lib/blue'
+import { serviceAmount, splitFromEstimate } from '../lib/blue'
 import { cents, cn, money, pct } from '../lib/util'
 import { Badge, Button, Callout, NumInput } from './ui'
 import { exportCosting } from '../lib/export'
@@ -45,15 +45,18 @@ export function CostingSheet() {
     paid: cents(loanLines.reduce((a, l) => a + l.paid, 0)),
     drawn: cents(loanLines.reduce((a, l) => a + (drawn[l.id]?.drawn ?? 0), 0)),
   }
-  const b = calcBlue(blue)
+  // Q17: the 9000 block is the split of the house price (who gets what), not an extra cost.
+  const houseLine = lines.find(l => l.id === 'pa')
+  const split = splitFromEstimate(blue, houseLine?.approved ?? 0)
   const hidden = [
-    { name: 'Modular Wholesale Cost', v: blue.wholesale, refs: BLUE_REFS.wholesale },
-    { name: 'Uni-Frame', v: blue.uniFrame, refs: BLUE_REFS.uniFrame },
-    ...blue.services.map(s => ({ name: s.name, v: serviceAmount(blue, s), refs: BLUE_REFS[s.id] ?? [] })),
-    { name: 'TinyMod Margin', v: b.margin, refs: BLUE_REFS.margin },
-    { name: 'One-Off Project', v: b.oneOff, refs: BLUE_REFS.oneOff },
+    { name: 'Modular Wholesale Cost (factory)', v: blue.wholesale, refs: BLUE_REFS.wholesale },
+    ...(blue.uniFrame ? [{ name: 'Uni-Frame', v: blue.uniFrame, refs: BLUE_REFS.uniFrame }] : []),
+    { name: 'Sales tax (in the house price)', v: blue.salesTax, refs: BLUE_REFS.salesTax },
+    ...(split.tariff ? [{ name: 'Tariff', v: split.tariff, refs: BLUE_REFS.tariff }] : []),
+    ...blue.services.map(s => ({ name: `${s.name}${s.payee ? ` (${s.payee})` : ''}`, v: serviceAmount(blue, s), refs: BLUE_REFS[s.id] ?? [] })),
+    { name: 'TinyMod Margin (what\'s left)', v: split.margin, refs: [{ s: 'OF7' as const, c: 'AB77', note: 'estimate total minus everything above' }] },
   ]
-
+  const hiddenTotal = hidden.reduce((a, h) => a + h.v, 0)
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start gap-3">
@@ -133,8 +136,8 @@ export function CostingSheet() {
             })}
             <tr className="bg-brand-50/50">
               <td colSpan={8} className="border-b border-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-500">
-                <span className="mr-2 rounded bg-white px-1.5 py-0.5 ring-1 ring-brand-200">9000</span>Margin & Internal
-                <span className="ml-2 inline-flex items-center gap-1 normal-case"><EyeOff size={11} /> hidden from the customer · not in contract</span>
+                <span className="mr-2 rounded bg-white px-1.5 py-0.5 ring-1 ring-brand-200">9000</span>Margin & Internal: how the house price splits
+                <span className="ml-2 inline-flex items-center gap-1 normal-case"><EyeOff size={11} /> hidden from the customer · not a cost · not in contract</span>
                 <Q ids="Q17" className="ml-2" />
               </td>
             </tr>
@@ -149,6 +152,12 @@ export function CostingSheet() {
                 <td colSpan={4} className="border-b border-line" />
               </tr>
             ))}
+            <tr className="bg-brand-50/40 text-ink-700">
+              <td className="border-b border-line px-3 py-1.5 text-[13px] font-semibold">Adds up to the house line (2000)</td>
+              <td colSpan={2} className="border-b border-line px-3 py-1.5 text-2xs text-ok-700">{Math.abs(hiddenTotal - (houseLine?.approved ?? 0)) < 0.005 ? '✓ matches the estimate total' : 'does not match the house line'}</td>
+              <td className="border-b border-line px-3 py-1.5 text-right text-[13px] font-semibold tnum">{money(hiddenTotal)}</td>
+              <td colSpan={4} className="border-b border-line" />
+            </tr>
           </tbody>
           <tfoot>
             <tr className="bg-ink-50">

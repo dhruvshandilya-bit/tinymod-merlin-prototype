@@ -83,9 +83,9 @@ export function Estimate() {
               </div>
             </div>
           </div>
-          <Callout tone="warn" className="text-[12px]">
-            The bank-approved purchase agreement is <b>{money(168992)}</b> <Src refs={{ s: 'DRAW', c: 'C8' }} />, which is {money(total - 168992)} less than this estimate.
-            The budget uses the bank's number until <Q ids="Q1" /> is answered.
+          <Callout tone="ok" className="text-[12px]">
+            The estimate total is final <Q ids="Q1" />. The bank's sheet still had <b>{money(168992)}</b> <Src refs={{ s: 'DRAW', c: 'C8' }} />, an earlier version.
+            The budget carries {money(total)}, and contingency absorbs the {money(total - 168992)}.
           </Callout>
           <Button variant="outline" className="w-full" onClick={() => go('budget')}>Signed: open the project budget <ArrowRight size={13} /></Button>
         </div>

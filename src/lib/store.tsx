@@ -4,6 +4,7 @@ import type { Blue } from './blue'
 import { jobBlue, jobProject, jobSteps, type Step, type StepStatus } from '../data/job'
 
 import type { StepKey } from '../data/walkthrough'
+import type { SourceKey } from '../data/sources'
 
 export interface Toast { id: number; text: string }
 export type BudgetTab = 'budget' | 'changeOrders' | 'draws' | 'conversation'
@@ -22,6 +23,8 @@ function useStoreValue() {
   const [showEmpty, setShowEmpty] = useState(false)
   const [drawer, setDrawer] = useState<null | 'questions' | 'sources'>(null)
   const [focusQ, setFocusQ] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<{ key: SourceKey; cell?: string; note?: string } | null>(null)
+  const openSource = (key: SourceKey, cell?: string, note?: string) => setViewer({ key, cell, note })
   const [nav, setNav] = useState<Nav>({ step: 'overview', budgetTab: 'budget' })
   const openQuestion = (id: string) => { setFocusQ(id); setDrawer('questions') }
   const go = (step: StepKey) => {
@@ -82,7 +85,7 @@ function useStoreValue() {
   return { project, setProject, blue, setBlue, steps, setSteps, toasts, toast,
            updateLine, setDraws, fundFromContingency, setStepStatus, reset,
            showSources, setShowSources, showNotes, setShowNotes, showEmpty, setShowEmpty,
-           drawer, setDrawer, focusQ, openQuestion, nav, go, setBudgetTab }
+           drawer, setDrawer, focusQ, openQuestion, nav, go, setBudgetTab, viewer, setViewer, openSource }
 }
 
 type Store = ReturnType<typeof useStoreValue>

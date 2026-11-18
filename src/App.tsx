@@ -2,7 +2,7 @@ import React from 'react'
 import { BookOpen, ChevronRight, Eye, EyeOff, HelpCircle, Megaphone, RotateCcw, Sparkles } from 'lucide-react'
 import { StoreProvider, useStore } from './lib/store'
 import { PROJECT_META, ORDER_FORM } from './data/job'
-import { QUESTIONS } from './data/questions'
+import { OPEN } from './data/questions'
 import { WALK } from './data/walkthrough'
 import { cn } from './lib/util'
 import { Badge } from './components/ui'
@@ -10,6 +10,7 @@ import { Estimate } from './components/Estimate'
 import { Budget } from './components/Budget'
 import { Schedule } from './components/Schedule'
 import { Drawers } from './components/refs'
+import { SheetViewer } from './components/SheetViewer'
 import { NotesPanel, Overview, StepBar } from './components/Walk'
 
 export default function App() {
@@ -43,7 +44,7 @@ function Layout() {
           <Toggle on={showSources} onClick={() => setShowSources(!showSources)} icon={showSources ? Eye : EyeOff} label="Show sources" />
           <button onClick={() => setDrawer('sources')} title="Where the data came from" className="grid h-8 w-8 place-items-center rounded-md text-ink-600 hover:bg-ink-100"><BookOpen size={15} /></button>
           <button onClick={() => setDrawer('questions')} className="flex h-8 items-center gap-1 rounded-md bg-danger-50 px-2 text-2xs font-semibold text-danger-600 ring-1 ring-inset ring-danger-500/30 hover:bg-danger-500 hover:text-white">
-            <HelpCircle size={13} /> Questions ({QUESTIONS.length})
+            <HelpCircle size={13} /> {OPEN.length} open questions
           </button>
           {!showNotes && <Toggle on={false} onClick={() => setShowNotes(true)} icon={Megaphone} label="Notes" />}
           <button onClick={reset} title="Reset to the sheets as sent" className="grid h-8 w-8 place-items-center rounded-md text-ink-500 hover:bg-ink-100"><RotateCcw size={14} /></button>
@@ -85,6 +86,7 @@ function Layout() {
       </div>
 
       <Drawers />
+      <SheetViewer />
       <div className="pointer-events-none fixed bottom-4 left-4 z-50 flex w-[360px] max-w-[calc(100vw-32px)] flex-col gap-2">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto rounded-lg bg-ink-950 px-3.5 py-2.5 text-[12.5px] leading-snug text-white shadow-lg">{t.text}</div>
